@@ -5,6 +5,8 @@ using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
+// TODO: Seperate some RabbitMQ value to .env file
+
 var factory = new ConnectionFactory()
 {
     HostName = "localhost",
