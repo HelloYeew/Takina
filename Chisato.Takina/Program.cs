@@ -1,18 +1,58 @@
 ﻿using System.Text;
 using Chisato.Takina;
 using Chisato.Takina.Database;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Sentry;
 
-// TODO: Seperate some RabbitMQ value to .env file
+// Check that the appsettings.json file exists
+if (!File.Exists("appsettings.json"))
+{
+    Console.WriteLine("❌ appsettings.json file not found, please put it in the " + Directory.GetCurrentDirectory() + " folder");
+    Environment.Exit(1);
+    return;
+}
+
+// load appsettings.json from root of source code, not from bin/Debug/net7.0
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+#region Sentry
+
+if (Boolean.Parse(configuration["Sentry:Enabled"] ?? string.Empty))
+{
+    using (SentrySdk.Init(o =>
+           {
+               o.Dsn = configuration["Sentry:DSN"];
+               // When configuring for the first time, to see what the SDK is doing:
+               o.Debug = false;
+               // Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring.
+               // We recommend adjusting this value in production.
+               o.TracesSampleRate = 1.0;
+               // Enable Global Mode if running in a client app
+               o.IsGlobalModeEnabled = true;
+           }))
+    {
+        // App code goes here. Dispose the SDK before exiting to flush events.
+        Console.WriteLine("✅ Sentry initialized");
+    }
+}
+
+#endregion
+
+Console.WriteLine("✅ appsettings.json loaded");
 
 var factory = new ConnectionFactory()
 {
-    HostName = "localhost",
-    UserName = "user",
-    Password = "password",
-    Port = 5672
+    HostName = configuration["RabbitMQ:HostName"],
+    UserName = configuration["RabbitMQ:UserName"],
+    Password = configuration["RabbitMQ:Password"],
+    Port = int.Parse(configuration["RabbitMQ:Port"] ?? string.Empty)
 };
 using var connection = factory.CreateConnection();
 using var databaseProcessChannel = connection.CreateModel();
@@ -118,6 +158,8 @@ consumer.Received += async (model, ea) =>
     catch (Exception e)
     {
         Console.WriteLine("❌ Error during processing the message: " + e.Message);
+        // Capture exception with sending e.Message to Sentry
+        SentrySdk.CaptureException(e);
     }
 };
 
@@ -137,10 +179,10 @@ void PublishMessage(List<string> messagesList)
 {
     var newFactory = new ConnectionFactory()
     {
-        HostName = "localhost",
-        UserName = "user",
-        Password = "password",
-        Port = 5672
+        HostName = configuration["RabbitMQ:HostName"],
+        UserName = configuration["RabbitMQ:UserName"],
+        Password = configuration["RabbitMQ:Password"],
+        Port = int.Parse(configuration["RabbitMQ:Port"] ?? string.Empty)
     };
     
     var newConnection = newFactory.CreateConnection();
@@ -190,6 +232,7 @@ void PublishMessage(List<string> messagesList)
         catch (Exception e)
         {
             Console.WriteLine("❌ Error during sending the message: " + e.Message);
+            SentrySdk.CaptureException(e);
         }
         Console.WriteLine($"🚀 Sent {apiProcessMessageBytes}");
     }
