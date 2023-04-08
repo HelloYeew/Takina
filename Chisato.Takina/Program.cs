@@ -210,6 +210,8 @@ void PublishMessage(List<string> messagesList)
         routingKey: "api-process-default"
     );
     
+    apiProcessChannel.BasicQos(0, 1, false);
+    
     // Track unrouteable messages
     apiProcessChannel.CallbackException += (sender, ea) =>
     {
