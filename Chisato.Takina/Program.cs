@@ -171,7 +171,7 @@ while (true)
         autoAck: true,
         consumer: consumer
     );
-    Thread.Sleep(5000);
+    Thread.Sleep(2000);
     Console.WriteLine("⏱️ Waiting for messages.");
 }
 
