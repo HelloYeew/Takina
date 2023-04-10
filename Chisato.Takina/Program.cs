@@ -6,6 +6,8 @@ using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Sentry;
+using Serilog;
+using Serilog.Sinks.Loki;
 
 // Check that the appsettings.json file exists
 if (!File.Exists("appsettings.json"))
@@ -45,7 +47,31 @@ if (Boolean.Parse(configuration["Sentry:Enabled"] ?? string.Empty))
 
 #endregion
 
-Console.WriteLine("✅ appsettings.json loaded");
+#region Logger
+
+if (Boolean.Parse(configuration["Logging:Loki:Enabled"] ?? string.Empty))
+{
+    var credentials = new NoAuthCredentials(configuration["Logging:Loki:Url"]);
+
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.LokiHttp(credentials)
+        .CreateLogger();
+}
+else
+{
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .CreateLogger();
+}
+
+#endregion
+
+Log.Information("✅ appsettings.json loaded");
 
 var factory = new ConnectionFactory()
 {
@@ -65,7 +91,7 @@ databaseProcessChannel.QueueDeclare(
     arguments: null
 );
 
-Console.WriteLine("⏱️ Waiting for messages.");
+Log.Information("⏱️ Waiting for messages");
 
 var consumer = new EventingBasicConsumer(databaseProcessChannel);
 
@@ -77,7 +103,7 @@ consumer.Received += async (model, ea) =>
     {
         var body = ea.Body.ToArray();
         var message = Encoding.UTF8.GetString(body);
-        Console.WriteLine("✉️ Received {0}", message);
+        Log.Information($"✉️ Received {message}");
         
         // Payload example (JSON):
         // {"user_id": 1, "file_type": "osu", "file_name": "osu_COJSuxolYcGMDdHz.db",
@@ -100,7 +126,6 @@ consumer.Received += async (model, ea) =>
         }
         // get file path
         var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
-        Console.WriteLine($"File path: {filePath}");
         switch (fileType)
         {
             case "osu":
@@ -145,7 +170,7 @@ consumer.Received += async (model, ea) =>
                 break;
             
             default:
-                Console.WriteLine("❌ Unknown file type");
+                Log.Error("❌ Unknown file type");
                 break;
         }
         
@@ -157,7 +182,7 @@ consumer.Received += async (model, ea) =>
     }
     catch (Exception e)
     {
-        Console.WriteLine("❌ Error during processing the message: " + e.Message);
+        Log.Error("❌ Error during processing the message: " + e.Message);
         // Capture exception with sending e.Message to Sentry
         SentrySdk.CaptureException(e);
     }
@@ -172,7 +197,6 @@ while (true)
         consumer: consumer
     );
     Thread.Sleep(2000);
-    Console.WriteLine("⏱️ Waiting for messages.");
 }
 
 void PublishMessage(List<string> messagesList)
@@ -215,7 +239,7 @@ void PublishMessage(List<string> messagesList)
     // Track unrouteable messages
     apiProcessChannel.CallbackException += (sender, ea) =>
     {
-        Console.WriteLine("❌ Unrouteable message: " + ea.Exception.Message);
+        Log.Error("❌ Unrouteable message: " + ea.Exception.Message);
     };
     
     // Send messages to API process queue
@@ -233,9 +257,9 @@ void PublishMessage(List<string> messagesList)
         }
         catch (Exception e)
         {
-            Console.WriteLine("❌ Error during sending the message: " + e.Message);
+            Log.Error("❌ Error during sending the message: " + e.Message);
             SentrySdk.CaptureException(e);
         }
-        Console.WriteLine($"🚀 Sent {apiProcessMessageBytes}");
+        Log.Information($"🚀 Sent {apiProcessMessageBytes}");
     }
 }
