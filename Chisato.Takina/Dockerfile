@@ -1,5 +1,8 @@
 ﻿FROM mcr.microsoft.com/dotnet/runtime:7.0 AS base
 WORKDIR /app
+COPY ["Chisato.Takina/appsettings.json", "/app/"]
+# Open rabbitmq port to make rabbitmq from outside of container can connect to program
+EXPOSE 5672
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
