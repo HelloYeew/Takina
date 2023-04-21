@@ -214,6 +214,12 @@ void PublishMessage(List<string> messagesList)
         Port = int.Parse(configuration["RabbitMQ:Port"] ?? string.Empty)
     };
     
+    if (Boolean.Parse(configuration["RabbitMQ:UseSSL"] ?? string.Empty))
+    {
+        newFactory.Ssl.Enabled = true;
+        newFactory.Uri = new Uri($"amqps://{configuration["RabbitMQ:HostName"]}:{configuration["RabbitMQ:Port"]}");
+    }
+    
     var newConnection = newFactory.CreateConnection();
     using var apiProcessChannel = newConnection.CreateModel();
     
