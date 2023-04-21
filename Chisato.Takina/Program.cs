@@ -80,6 +80,11 @@ var factory = new ConnectionFactory()
     Password = configuration["RabbitMQ:Password"],
     Port = int.Parse(configuration["RabbitMQ:Port"] ?? string.Empty)
 };
+if (Boolean.Parse(configuration["RabbitMQ:UseSSL"] ?? string.Empty))
+{
+    factory.Ssl.Enabled = true;
+    factory.Uri = new Uri($"amqps://{configuration["RabbitMQ:HostName"]}:{configuration["RabbitMQ:Port"]}");
+}
 using var connection = factory.CreateConnection();
 using var databaseProcessChannel = connection.CreateModel();
 
