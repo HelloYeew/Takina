@@ -2,7 +2,7 @@
 
 The osu! database and collection processor for [chisato](https://github.com/HelloYeew/chisato).
 
-## Developing Takina
+## Developing Takina and more information
 
 See [Chisato wiki](https://github.com/HelloYeew/chisato/wiki/Developing-Chisato) for more information.
 
